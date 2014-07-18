@@ -27,6 +27,8 @@ new Module::Build(
     requires => {
         'Astro::Coords' => 0,
         'Astro::Coord::ECI' => 0,
+        'DateTime' => 0,
+        'DateTime::Duration' => 0,
     },
     build_requires => {
         'Test::More' => 0,
