@@ -29,4 +29,48 @@ use parent qw/Astro::Coords/;
 
 our $VERSION = '0.001';
 
+=head1 METHODS
+
+=head2 Constructor
+
+=over 4
+
+=item B<new>
+
+Construct a new object.
+
+=cut
+
+sub new {
+    my $class = shift;
+    my %opt = @_;
+
+    my $self = {
+        name => $opt{'name'},
+    };
+
+    return bless $self, (ref $class) || $class;
+}
+
+=back
+
+=head2 Accessor Methods
+
+=over 4
+
+=item B<type>
+
+Return the type name associated with the coordinate system, which in the
+case of this class is always TLE.
+
+=cut
+
+sub type {
+    return 'TLE';
+}
+
+=back
+
+=cut
+
 1;
