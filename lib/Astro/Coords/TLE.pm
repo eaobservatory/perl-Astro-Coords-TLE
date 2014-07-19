@@ -219,6 +219,88 @@ sub perigee {
     return $self->{'perigee'};
 }
 
+=back
+
+=head2 General Methods
+
+=over 4
+
+=item B<array>
+
+Give a 11-element standard Astro::Coords array representation of
+this object.  The array contains:
+
+=over 4
+
+=item 0
+
+Coordinate type ("TLE").
+
+=item 1
+
+RA (undef).
+
+=item 2
+
+Dec (undef).
+
+=item 3
+
+Epoch (fractional UNIX epoch timestamp).
+
+=item 4
+
+Bstar (inverse Earth radii).
+
+=item 5
+
+Inclination (radians).
+
+=item 6
+
+RA of ascending node (radians).
+
+=item 7
+
+Eccentricity.
+
+=item 8
+
+Perigee (radians).
+
+=item 9
+
+Mean anomaly (radians).
+
+=item 10
+
+Mean motion (revolutions per day).
+
+=back
+
+The ordering of these terms has been chosen to match that conventionally
+used when printing TLEs.
+
+=cut
+
+sub array {
+    my $self = shift;
+
+    return (
+        $self->type(),
+        undef,
+        undef,
+        $self->{'epoch'}->hires_epoch(),
+        $self->{'bstar'},
+        $self->{'inclination'}->radians(),
+        $self->{'raanode'}->radians(),
+        $self->{'e'},
+        $self->{'perigee'}->radians(),
+        $self->{'mean_anomaly'}->radians(),
+        $self->{'mean_motion'},
+    );
+}
+
 =item B<type>
 
 Return the type name associated with the coordinate system, which in the
