@@ -46,9 +46,15 @@ Construct a new object.  Takes the following parameters:
 
 =item name
 
+=item epoch (fractional UNIX time), or:
+
+=over 4
+
 =item epoch_year
 
 =item epoch_day
+
+=back
 
 =item bstar (inverse Earth radii)
 
@@ -72,17 +78,32 @@ sub new {
     my $class = shift;
     my %opt = @_;
 
-    # Convert epoch year and (fractional) day into a DateTime object.
-    my $year = $opt{'epoch_year'};
-    my $fracday = $opt{'epoch_day'};
-    my $day = int($fracday);
-    my $nanoseconds = 24000000000.0 * 3600.0 * ($fracday - $day);
+    my $epoch;
 
-    my $epoch = DateTime->from_day_of_year(
-                    time_zone => 'UTC',
-                    year => $year,
-                    day_of_year => $day) +
-                DateTime::Duration->new(nanoseconds => $nanoseconds);
+    if (exists $opt{'epoch'}) {
+        if (UNIVERSAL::isa($opt{'epoch'}, 'DateTime')) {
+            $epoch = $opt{'epoch'}->clone();
+        }
+        else {
+            $epoch = DateTime->from_epoch(
+                            time_zone => 'UTC',
+                            epoch => $opt{'epoch'},
+            );
+        }
+    }
+    else {
+        # Convert epoch year and (fractional) day into a DateTime object.
+        my $year = $opt{'epoch_year'};
+        my $fracday = $opt{'epoch_day'};
+        my $day = int($fracday);
+        my $nanoseconds = 24000000000.0 * 3600.0 * ($fracday - $day);
+
+        $epoch = DateTime->from_day_of_year(
+                        time_zone => 'UTC',
+                        year => $year,
+                        day_of_year => $day) +
+                    DateTime::Duration->new(nanoseconds => $nanoseconds);
+    }
 
     my $self = {
         name => $opt{'name'},
