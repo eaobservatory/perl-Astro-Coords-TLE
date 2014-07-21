@@ -30,6 +30,8 @@ use DateTime::Duration;
 
 use parent qw/Astro::Coords/;
 
+use overload '""' => \&stringify;
+
 our $VERSION = '0.001';
 
 =head1 METHODS
@@ -318,6 +320,27 @@ sub array {
         $self->{'e'},
         $self->{'perigee'}->radians(),
         $self->{'mean_anomaly'}->radians(),
+        $self->{'mean_motion'},
+    );
+}
+
+=item B<stringify>
+
+Return a string representation of the object.
+
+=cut
+
+sub stringify {
+    my $self = shift;
+
+    return join ' ', 'TLE', $self->epoch_year(), map {sprintf '%.3f', $_} (
+        $self->epoch_day(),
+        $self->{'bstar'},
+        $self->{'inclination'}->degrees(),
+        $self->{'raanode'}->degrees(),
+        $self->{'e'},
+        $self->{'perigee'}->degrees(),
+        $self->{'mean_anomaly'}->degrees(),
         $self->{'mean_motion'},
     );
 }
