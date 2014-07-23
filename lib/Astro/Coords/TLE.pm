@@ -26,8 +26,10 @@ use strict;
 use warnings;
 
 use Astro::Coord::ECI;
+use Astro::Coord::ECI::TLE;
 use DateTime;
 use DateTime::Duration;
+use Math::Trig qw/pi/;
 
 use parent qw/Astro::Coords/;
 
@@ -128,6 +130,17 @@ sub new {
             unless defined $val;
         $self->{$_} = $val;
     }
+
+    $self->{'eci_object'} = new Astro::Coord::ECI::TLE(
+        argumentofperigee => $self->{'perigee'}->radians(),
+        ascendingnode => $self->{'raanode'}->radians(),
+        bstardrag => $self->{'bstar'},
+        eccentricity => $self->{'e'},
+        epoch => $epoch->hires_epoch(),
+        inclination => $self->{'inclination'}->radians(),
+        meananomaly => $self->{'mean_anomaly'}->radians(),
+        meanmotion => ($self->{'mean_motion'} * 2.0 * pi / (24.0 * 60.0)),
+    );
 
     return bless $self, (ref $class) || $class;
 }
