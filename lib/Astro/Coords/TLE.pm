@@ -25,6 +25,7 @@ package Astro::Coords::TLE;
 use strict;
 use warnings;
 
+use Astro::Coord::ECI;
 use DateTime;
 use DateTime::Duration;
 
@@ -240,6 +241,33 @@ Return the perigee (angle object).
 sub perigee {
     my $self = shift;
     return $self->{'perigee'};
+}
+
+=item B<telescope>
+
+Set or return the telescope (Astro::Telescope object).
+
+=cut
+
+sub telescope {
+    my $self = shift;
+
+    # If we were given a telescope, use its position to set up an
+    # ECI station object.
+    if (@_) {
+        my $telescope = $_[0];
+        die 'Telescope must be an Astro::Telescope object'
+            unless UNIVERSAL::isa($telescope, 'Astro::Telescope');
+
+        my $station = Astro::Coord::ECI->geodetic($telescope->lat(),
+                                                  $telescope->long(),
+                                                  $telescope->alt() / 1000.0);
+
+        $self->{'eci_station'} = $station;
+    }
+
+    # Call superclass telescope method.
+    return $self->SUPER::telescope(@_);
 }
 
 =back
