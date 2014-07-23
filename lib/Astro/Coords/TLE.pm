@@ -378,24 +378,33 @@ given telescope.
 sub apparent {
     my $self = shift;
 
-    my $station = $self->{'eci_station'};
-    die 'station (i.e. telescope) not defined' unless defined $station;
+    # Check for cached values.
+    my ($ra_app, $dec_app) = $self->_cache_read('RA_APP', 'DEC_APP');
 
-    my $object = $self->{'eci_object'};
-    die 'object (Astro::Coord::ECI::TLE) not defined' unless defined $object;
+    unless ((defined $ra_app) and (defined $dec_app)) {
+        my $station = $self->{'eci_station'};
+        die 'station (i.e. telescope) not defined' unless defined $station;
 
-    my $dt = $self->datetime();
-    # Astro::Coords still allows the old Time::Piece objects to be used
-    # and those don't support hires_epoch.
-    my $epoch = UNIVERSAL::isa($dt, 'Time::Piece')
-              ? $dt->epoch()
-              : $dt->hires_epoch();
+        my $object = $self->{'eci_object'};
+        die 'object not defined' unless defined $object;
 
-    $object->sgp4r($epoch);
-    my ($ra, $dec, $range) = $station->equatorial($object);
+        my $dt = $self->datetime();
+        # Astro::Coords still allows the old Time::Piece objects to be used
+        # and those don't support hires_epoch.
+        my $epoch = UNIVERSAL::isa($dt, 'Time::Piece')
+                  ? $dt->epoch()
+                  : $dt->hires_epoch();
 
-    return (new Astro::Coords::Angle::Hour($ra, units => 'radians'),
-            new Astro::Coords::Angle($dec, units => 'radians'));
+        $object->sgp4r($epoch);
+        my ($ra, $dec, $range) = $station->equatorial($object);
+
+        $ra_app = new Astro::Coords::Angle::Hour($ra, units => 'radians');
+        $dec_app = new Astro::Coords::Angle($dec, units => 'radians');
+
+        $self->_cache_write('RA_APP' => $ra_app, 'DEC_APP' => $dec_app);
+    }
+
+    return ($ra_app, $dec_app);
 }
 
 =item B<stringify>
