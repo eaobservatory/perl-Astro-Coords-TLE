@@ -9,3 +9,5 @@ t/2_tle-array.t
 t/2_tle-epoch.t
 t/3_tle-object.t
 t/3_tle-telescope.t
+t/4_tle-apparent.t
+t/data/uk1920140909504.txt2.mlb

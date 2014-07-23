@@ -276,6 +276,9 @@ sub telescope {
                                                   $telescope->long(),
                                                   $telescope->alt() / 1000.0);
 
+        # Disable refraction for apparent RA/Dec calculation.
+        $station->set('refraction', 0);
+
         $self->{'eci_station'} = $station;
     }
 
@@ -363,6 +366,36 @@ sub array {
         $self->{'mean_anomaly'}->radians(),
         $self->{'mean_motion'},
     );
+}
+
+=item B<apparent>
+
+Calculate apparent RA and Declination of the object from the
+given telescope.
+
+=cut
+
+sub apparent {
+    my $self = shift;
+
+    my $station = $self->{'eci_station'};
+    die 'station (i.e. telescope) not defined' unless defined $station;
+
+    my $object = $self->{'eci_object'};
+    die 'object (Astro::Coord::ECI::TLE) not defined' unless defined $object;
+
+    my $dt = $self->datetime();
+    # Astro::Coords still allows the old Time::Piece objects to be used
+    # and those don't support hires_epoch.
+    my $epoch = UNIVERSAL::isa($dt, 'Time::Piece')
+              ? $dt->epoch()
+              : $dt->hires_epoch();
+
+    $object->sgp4r($epoch);
+    my ($ra, $dec, $range) = $station->equatorial($object);
+
+    return (new Astro::Coords::Angle::Hour($ra, units => 'radians'),
+            new Astro::Coords::Angle($dec, units => 'radians'));
 }
 
 =item B<stringify>
