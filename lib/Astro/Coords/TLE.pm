@@ -132,6 +132,7 @@ sub new {
     }
 
     $self->{'eci_object'} = new Astro::Coord::ECI::TLE(
+        id => 99999,
         argumentofperigee => $self->{'perigee'}->radians(),
         ascendingnode => $self->{'raanode'}->radians(),
         bstardrag => $self->{'bstar'},
@@ -394,6 +395,12 @@ sub apparent {
         my $epoch = UNIVERSAL::isa($dt, 'Time::Piece')
                   ? $dt->epoch()
                   : $dt->hires_epoch();
+
+        # Set the object's "universal" time in order to avoid a confusing
+        # error message if the sgp4r method fails.  In that case
+        # Astro::Coord::ECI::TLE attempts to generate an error message
+        # but fails to do so if the object doesn't have the time set.
+        $object->universal($epoch);
 
         $object->sgp4r($epoch);
         my ($ra, $dec, $range) = $station->equatorial($object);
