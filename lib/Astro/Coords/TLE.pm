@@ -97,6 +97,15 @@ sub new {
         }
     }
     else {
+        # As we didn't get epoch, check epoch_year and epoch_day.
+        die 'TLE epoch or epoch_day and epoch_year must be defined'
+            unless ((defined $opt{'epoch_year'})
+                and (defined $opt{'epoch_day'}));
+
+        # Ensure epoch number is not negative.
+        # die 'TLE epoch year should not be before 1970'
+        #    if $opt{'epoch_year'} < 1970;
+
         # Convert epoch year and (fractional) day into a DateTime object.
         my $year = $opt{'epoch_year'};
         my $fracday = $opt{'epoch_day'};
