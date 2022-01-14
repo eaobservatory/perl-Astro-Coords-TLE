@@ -33,6 +33,8 @@ new Module::Build(
     build_requires => {
         'Test::More' => 0,
         'Test::Number::Delta' => 0,
+    },
+    recommends => {
         'UKIRT::JunkTrack::Parse' => 0,
     },
 )->create_build_script();

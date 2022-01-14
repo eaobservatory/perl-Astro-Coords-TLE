@@ -1,12 +1,22 @@
-use Test::More tests => 1 + 6000 * 2;
+use Test::More;
 use Test::Number::Delta within => 0.05;
 
 use strict;
 
+eval {
+    require UKIRT::JunkTrack::Parse;
+};
+if ($@) {
+    plan skip_all => 'UKIRT::JunkTrack::Parse module not installed';
+    exit;
+}
+else {
+    plan tests => 1 + 6000 * 2;
+}
+
 use Astro::Coords::TLE;
 use Astro::Telescope;
 use Math::Trig qw/pi/;
-use UKIRT::JunkTrack::Parse qw/parse_file/;
 
 # Create TLE object for SSN 39504.
 
@@ -28,7 +38,7 @@ isa_ok($c, 'Astro::Coords::TLE');
 $c->telescope(new Astro::Telescope('UKIRT'));
 
 # Get reference data for SSN 39504.
-my $ref = parse_file('t/data/uk1920140909504.txt2.mlb');
+my $ref = UKIRT::JunkTrack::Parse::parse_file('t/data/uk1920140909504.txt2.mlb');
 
 foreach my $record (@$ref) {
     my ($dt, $ra_ref, $dec_ref) = @$record;
