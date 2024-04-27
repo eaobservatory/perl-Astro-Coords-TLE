@@ -1,4 +1,5 @@
 # Copyright (C) 2014 Science and Technology Facilities Council.
+# Copyright (C) 2024 East Asian Observatory.
 # All Rights Reserved.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,6 +28,7 @@ use warnings;
 
 use Astro::Coord::ECI;
 use Astro::Coord::ECI::TLE;
+use Astro::Coords::Angle;
 use DateTime;
 use DateTime::Duration;
 use Math::Trig qw/pi/;
@@ -74,6 +76,26 @@ Construct a new object.  Takes the following parameters:
 =item perigee (angle object)
 
 =item raanode (angle object)
+
+=back
+
+And optionally:
+
+=over 4
+
+=item class (U, C or S)
+
+=item intl_desig
+
+=item first_d
+
+=item second_d
+
+=item ephem_type (always zero)
+
+=item elset_num
+
+=item rev_at_epoch (revolutions)
 
 =back
 
@@ -140,6 +162,14 @@ sub new {
         $self->{$_} = $val;
     }
 
+    # Handle optional parameters.
+    foreach (qw/class intl_desig first_d second_d ephem_type elset_num rev_at_epoch/) {
+        if (exists $opt{$_}) {
+            my $val = $opt{$_};
+            $self->{$_} = $val if defined $val;
+        }
+    }
+
     $self->{'eci_object'} = new Astro::Coord::ECI::TLE(
         id => 99999,
         argumentofperigee => $self->{'perigee'}->radians(),
@@ -153,6 +183,226 @@ sub new {
     );
 
     return bless $self, (ref $class) || $class;
+}
+
+=back
+
+=head2 Parsing and Formatting Methods
+
+=over 4
+
+=item B<parse_tle>
+
+Parse two line elements:
+
+    $coords = Astro::Coords::TLE->parse_tle($line1, $line2);
+
+=cut
+
+# Parsing routine, conversion to Perl of omp.tle.parse.TLEParser.parse_tle by BHG.
+
+sub parse_tle {
+    my $cls = shift;
+    my $line1 = shift;
+    my $line2 = shift;
+
+    if (length($line1) < 62 or length($line2) < 69) {
+        die 'Unparseable TLE';
+    }
+
+    my $id = substr($line1, 2, 5);
+    unless ($id =~ /^[0-9]+$/) {
+        die 'invalid identifier';
+    }
+
+    return $cls->new(
+        name => (sprintf 'NORAD%05d', $id),
+        epoch => _convert_epoch(substr($line1, 18, 14)),
+        bstar => _parse_decimal_rhs(substr($line1, 53, 8)),
+        inclination => Astro::Coords::Angle->new(substr($line2, 8, 8), units => 'degrees'),
+        raanode => Astro::Coords::Angle->new(substr($line2, 17, 8), units => 'degrees'),
+        e => ('0.' . substr($line2, 26, 7)),
+        perigee => Astro::Coords::Angle->new(substr($line2, 34, 8), units => 'degrees'),
+        mean_anomaly => Astro::Coords::Angle->new(substr($line2, 43, 8), units => 'degrees'),
+        mean_motion => substr($line2, 52, 11),
+
+        # Optional parameters:
+        class => substr($line1, 7, 1),
+        intl_desig => (substr($line1, 9, 8) =~ s/ *$//r),
+        first_d => substr($line1, 33, 10),
+        second_d => _parse_decimal_rhs(substr($line1, 44, 8)),
+        ephem_type => substr($line1, 62, 1),
+        elset_num => substr($line1, 64, 4),
+        rev_at_epoch => substr($line2, 63, 5),
+    );
+}
+
+sub _convert_epoch {
+    my $astro = shift;
+
+    require DateTime::Format::Strptime;
+
+    $astro =~ s/^\s*//;
+    $astro =~ s/\s*$//;
+
+    my $strp = DateTime::Format::Strptime->new(
+        pattern => '%Y %j',
+        time_zone => 'UTC');
+
+    my $year = '20' . substr($astro, 0, 2);
+    my ($day, $decimal) = split /\./, substr($astro, 2), 2;
+    my $tday = $strp->parse_datetime($year . ' ' . $day);
+    my $eday = $strp->parse_datetime('1970 1');
+    my $days = ($eday->delta_days($tday))->in_units('days');
+
+    return ($days + ('0.' . $decimal)) * 24 * 3600;
+}
+
+# Routine to parse TLE-style right hand sides of
+# truncated decimals.  (i.e. the bit after the decimal
+# point)
+
+sub _parse_decimal_rhs {
+    my $decimal = shift;
+
+    $decimal =~ s/^\s*//;
+    $decimal =~ s/\s*$//;
+
+    my $sign = 1.0;
+    if ($decimal =~ /^-/) {
+        $decimal = substr($decimal, 1);
+        $decimal =~ s/^\s*//;
+        $sign = -1.0
+    }
+    elsif ($decimal =~ /^\+/) {
+        $decimal = substr($decimal, 1);
+        $decimal =~ s/^\s*//;
+    }
+
+    if ($decimal =~ /^(.*)([+-].*)$/) {
+        $decimal = sprintf '%sE%s', $1, $2;
+    }
+
+    return $sign * ('0.' . $decimal);
+}
+
+=item B<format_tle>
+
+Format object as two line elements:
+
+    ($line1, $line2) = $coords->format_tle();
+
+=cut
+
+sub format_tle {
+    my $self = shift;
+
+    my $number = $self->name;
+    $number =~ s/^NORAD//;
+
+    return map {$_ . _line_checksum($_)} (
+        (sprintf '1 %05d%1s %-8s %02d%12.8f %s %s %s %1d %4d',
+            $number,
+            $self->class,
+            $self->intl_desig,
+            (substr $self->epoch_year, 2),
+            $self->epoch_day,
+            _format_decimal($self->first_d, 10),
+            _format_decimal_rhs($self->second_d),
+            _format_decimal_rhs($self->bstar),
+            $self->ephem_type,
+            $self->elset_num,
+        ),
+        (sprintf '2 %05d %8.4f %8.4f %s %8.4f %8.4f %s%5d',
+            $number,
+            $self->inclination->degrees,
+            $self->raanode->degrees,
+            _format_decimal_nodp($self->e, 7),
+            $self->perigee->degrees,
+            $self->mean_anomaly->degrees,
+            _format_decimal($self->mean_motion, 11),
+            $self->rev_at_epoch,
+        ),
+    );
+}
+
+sub _format_decimal {
+    my $value = shift;
+    my $width = shift;
+
+    my $sign = '';
+    if ($value < 0.0) {
+        $sign = '-';
+        $width -= 1;
+        $value *= -1.0;
+    }
+
+    my $strip = 0;
+    if ($value < 1.0) {
+        $strip = 1;
+    }
+    else {
+        $width -= 1 + int(log($value) / log(10));
+    }
+
+    my $decimal = sprintf '%.*f', $width - 1, $value;
+
+    $decimal =~ s/^0// if $strip;
+
+    return $sign . $decimal;
+}
+
+sub _format_decimal_nodp {
+    my $value = shift;
+    my $width = shift;
+
+    die 'Invalid value for nodp formatting'
+        if $value < 0.0 or $value >= 1.0;
+
+    my $decimal = sprintf '%.*f', $width, $value;
+
+    $decimal =~ s/^0\.//;
+
+    return $decimal;
+}
+
+sub _format_decimal_rhs {
+    my $value = shift;
+
+    return ' 00000-0' if $value == 0.0;
+
+    my $sign = ' ';
+    if ($value < 0.0) {
+        $sign = '-';
+        $value *= -1.0;
+    }
+
+    die 'Invalid value for decimal_rhs formatting'
+        if $value >= 1.0;
+
+    my $exp = - int(log($value) / log(10));
+
+    $value *= 10 ** $exp;
+
+    $exp = sprintf '%d', $exp;
+
+    return sprintf '%s%s-%s', $sign, _format_decimal_nodp($value, 6 - length $exp), $exp;
+}
+
+sub _line_checksum {
+    my $line = shift;
+
+    my $sum = 0;
+    foreach (split '', $line) {
+        if (/[1-9]/) {
+            $sum += $_;
+        }
+        elsif (/-/) {
+            $sum ++;
+        }
+    }
+
+    return sprintf '%1d', $sum % 10;
 }
 
 =back
@@ -294,6 +544,90 @@ sub telescope {
 
     # Call superclass telescope method.
     return $self->SUPER::telescope(@_);
+}
+
+=back
+
+The following accessors can be used to retrieve optional parameters
+(supported for parsing and rewriting TLEs but not used in calculations):
+
+=over 4
+
+=item B<class>
+
+Classification (U: unclassified, C: classified, S: secret).
+
+=cut
+
+sub class {
+    my $self = shift;
+    return $self->{'class'};
+}
+
+=item B<intl_desig>
+
+2-digit launch year, 3-digit launch number, piece.
+
+=cut
+
+sub intl_desig {
+    my $self = shift;
+    return $self->{'intl_desig'};
+}
+
+=item B<first_d>
+
+First derivative of mean motion.
+
+=cut
+
+sub first_d {
+    my $self = shift;
+    return $self->{'first_d'};
+}
+
+=item B<second_d>
+
+Second derivative of mean motion.
+
+=cut
+
+sub second_d {
+    my $self = shift;
+    return $self->{'second_d'};
+}
+
+=item B<ephem_type>
+
+Ephemeris type.
+
+=cut
+
+sub ephem_type {
+    my $self = shift;
+    return $self->{'ephem_type'};
+}
+
+=item B<elset_num>
+
+Element set number.
+
+=cut
+
+sub elset_num {
+    my $self = shift;
+    return $self->{'elset_num'};
+}
+
+=item B<rev_at_epoch>
+
+Revolutions.
+
+=cut
+
+sub rev_at_epoch {
+    my $self = shift;
+    return $self->{'rev_at_epoch'};
 }
 
 =back
